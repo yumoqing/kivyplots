@@ -2,8 +2,9 @@ import matplotlib
 matplotlib.use('module://kivy.garden.matplotlib.backend_kivy')
 from kivy.garden.matplotlib.backend_kivyagg import NavigationToolbar2Kivy
 from kivy.uix.boxlayout import BoxLayout
+from kivy.clock import Clock
 import matplotlib.pyplot as plt
-from kivy.properties import BooleanProperty
+from kivy.properties import BooleanProperty, NumericProperty
 
 """
 def press(event):
@@ -64,16 +65,51 @@ class KivyPlot(BoxLayout):
 		'close_event': 'on_plot_close'
 	}
 	plot_bar = BooleanProperty(False)
+	figure_rows = NumericProperty(1)
+	figure_cols = NumericProperty(1)
 	def __init__(self, **kw):
 		super().__init__(**kw)
-		self.fig, self.ax = plt.subplots()
 		self.orientation = 'vertical'
+		self.redraw_task = None
+		self.bind(size=self.redraw_canvas)
+
+	def build_plot(self):
+		ax = self.init_plot()
+		self.build(ax)
+		self.finish_plot()
+
+	def finish_plot(self):
+		self.fig.tight_layout()
+		canvas = self.fig.canvas
+		if self.plot_bar:
+			nav1 = NavigationToolbar2Kivy(canvas)
+			self.add_widget(nav1.actionbar)
+		self.add_widget(canvas)
+	
+	def build(self, ax):
+		pass
+
+	def init_plot(self):
+		self.clear_widgets()
+		self.fig, self.ax = plt.subplots(nrows=self.figure_rows, 
+											ncols=self.figure_cols)
 		canvas = self.fig.canvas
 		f = self.event_handler
 		for ev in self.event_mappings.keys():
 			canvas.mpl_connect(ev, f)
 		for ev in self.event_mappings.values():
 			self.add_event_type(ev)
+		return self.ax
+
+	def redraw_canvas(self, *args):
+		if self.redraw_task:
+			self.redraw_task.cancel()
+			
+		self.redraw_task = Clock.schedule_once(self._redraw_canvas, 0.5)
+
+	def _redraw_canvas(self, *args):
+		print('Plot(): redraw() ...')
+		self.build_plot()
 
 	def add_event_type(self, name):
 		setattr(self, name, self.default_handler)
@@ -87,15 +123,10 @@ class KivyPlot(BoxLayout):
 		self.dispatch(ev, event)
 
 	def __enter__(self):
-		return self.ax
+		return self.init_plot()
 
 	def __exit__(self, *args):
-		canvas = self.fig.canvas
-		# canvas.draw()
-		if self.plot_bar:
-			nav1 = NavigationToolbar2Kivy(canvas)
-			self.add_widget(nav1.actionbar)
-		self.add_widget(canvas)
+		self.finish_plot()
 
 if __name__ == '__main__':
 	from kivy.app import App
