@@ -1,3 +1,4 @@
 kivy.garden
 # garden.matplotlib
 kivy
+matplotlib
